@@ -11,12 +11,14 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2;
+package zipkin2.elasticsearch;
 
 import java.nio.charset.Charset;
 import java.util.Calendar;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import zipkin2.Endpoint;
+import zipkin2.Span;
 
 public final class TestObjects {
   public static final Charset UTF_8 = Charset.forName("UTF-8");

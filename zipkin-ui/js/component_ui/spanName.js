@@ -30,8 +30,6 @@ export default component(function spanName() {
     this.$node.chosen({
       search_contains: true
     });
-    this.$node.next('.chosen-container').css('width', '100%');
-
     this.on(document, 'dataSpanNames', this.updateSpans);
   });
 });

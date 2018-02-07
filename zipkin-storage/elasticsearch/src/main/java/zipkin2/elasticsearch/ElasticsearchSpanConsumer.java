@@ -1,5 +1,5 @@
 /**
- * Copyright 2015-2018 The OpenZipkin Authors
+ * Copyright 2015-2017 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -29,6 +29,7 @@ import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.elasticsearch.internal.HttpBulkIndexer;
 import zipkin2.elasticsearch.internal.IndexNameFormatter;
 import zipkin2.elasticsearch.internal.client.HttpCall;
+import zipkin2.internal.Nullable;
 import zipkin2.storage.SpanConsumer;
 
 class ElasticsearchSpanConsumer implements SpanConsumer { // not final for testing
@@ -36,12 +37,10 @@ class ElasticsearchSpanConsumer implements SpanConsumer { // not final for testi
 
   final ElasticsearchStorage es;
   final IndexNameFormatter indexNameFormatter;
-  final boolean searchEnabled;
 
   ElasticsearchSpanConsumer(ElasticsearchStorage es) {
     this.es = es;
     this.indexNameFormatter = es.indexNameFormatter();
-    this.searchEnabled = es.searchEnabled();
   }
 
   @Override public Call<Void> accept(List<Span> spans) {
@@ -53,9 +52,9 @@ class ElasticsearchSpanConsumer implements SpanConsumer { // not final for testi
 
   void indexSpans(BulkSpanIndexer indexer, List<Span> spans) {
     for (Span span : spans) {
-      long spanTimestamp = span.timestampAsLong();
+      Long spanTimestamp = span.timestamp();
       long indexTimestamp = 0L; // which index to store this span into
-      if (spanTimestamp != 0L) {
+      if (spanTimestamp != null) {
         indexTimestamp = spanTimestamp = TimeUnit.MICROSECONDS.toMillis(spanTimestamp);
       } else {
         // guessTimestamp is made for determining the span's authoritative timestamp. When choosing
@@ -73,19 +72,15 @@ class ElasticsearchSpanConsumer implements SpanConsumer { // not final for testi
   static final class BulkSpanIndexer {
     final HttpBulkIndexer indexer;
     final IndexNameFormatter indexNameFormatter;
-    final boolean searchEnabled;
 
     BulkSpanIndexer(ElasticsearchStorage es) {
       this.indexer = new HttpBulkIndexer("index-span", es);
       this.indexNameFormatter = es.indexNameFormatter();
-      this.searchEnabled = es.searchEnabled();
     }
 
-    void add(long indexTimestamp, Span span, long timestampMillis) {
+    void add(long indexTimestamp, Span span, @Nullable Long timestampMillis) {
       String index = indexNameFormatter.formatTypeAndTimestamp(ElasticsearchSpanStore.SPAN, indexTimestamp);
-      byte[] document = searchEnabled
-        ? prefixWithTimestampMillisAndQuery(span, timestampMillis)
-        : SpanBytesEncoder.JSON_V2.encode(span);
+      byte[] document = prefixWithTimestampMillisAndQuery(span, timestampMillis);
       indexer.add(index, ElasticsearchSpanStore.SPAN, document, null /* Allow ES to choose an ID */);
     }
 
@@ -108,13 +103,13 @@ class ElasticsearchSpanConsumer implements SpanConsumer { // not final for testi
    *
    * <p>Ex {@code curl -s localhost:9200/zipkin:span-2017-08-11/_search?q=_q:error=500}
    */
-  static byte[] prefixWithTimestampMillisAndQuery(Span span, long timestampMillis) {
+  static byte[] prefixWithTimestampMillisAndQuery(Span span, @Nullable Long timestampMillis) {
     Buffer query = new Buffer();
     JsonWriter writer = JsonWriter.of(query);
     try {
       writer.beginObject();
 
-      if (timestampMillis != 0L) writer.name("timestamp_millis").value(timestampMillis);
+      if (timestampMillis != null) writer.name("timestamp_millis").value(timestampMillis);
       if (!span.tags().isEmpty() || !span.annotations().isEmpty()) {
         writer.name("_q");
         writer.beginArray();

@@ -1,5 +1,5 @@
 /**
- * Copyright 2015-2018 The OpenZipkin Authors
+ * Copyright 2015-2017 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,6 @@ import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Session;
-import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.google.auto.value.AutoValue;
 import java.util.Collections;
@@ -50,9 +49,9 @@ final class InsertSpan extends ResultSetFutureCall {
 
     @Nullable abstract String span();
 
-    abstract long ts();
+    @Nullable abstract Long ts();
 
-    abstract long duration();
+    @Nullable abstract Long duration();
 
     @Nullable abstract EndpointUDT l_ep();
 
@@ -72,11 +71,11 @@ final class InsertSpan extends ResultSetFutureCall {
   static class Factory {
     final Session session;
     final PreparedStatement preparedStatement;
-    final boolean strictTraceId, searchEnabled;
+    final boolean strictTraceId;
 
-    Factory(Session session, boolean strictTraceId, boolean searchEnabled) {
+    Factory(Session session, boolean strictTraceId) {
       this.session = session;
-      Insert insertQuery = QueryBuilder.insertInto(TABLE_SPAN)
+      this.preparedStatement = session.prepare(QueryBuilder.insertInto(TABLE_SPAN)
         .value("trace_id", QueryBuilder.bindMarker("trace_id"))
         .value("trace_id_high", QueryBuilder.bindMarker("trace_id_high"))
         .value("ts_uuid", QueryBuilder.bindMarker("ts_uuid"))
@@ -87,20 +86,14 @@ final class InsertSpan extends ResultSetFutureCall {
         .value("ts", QueryBuilder.bindMarker("ts"))
         .value("duration", QueryBuilder.bindMarker("duration"))
         .value("l_ep", QueryBuilder.bindMarker("l_ep"))
+        .value("l_service", QueryBuilder.bindMarker("l_service"))
         .value("r_ep", QueryBuilder.bindMarker("r_ep"))
         .value("annotations", QueryBuilder.bindMarker("annotations"))
         .value("tags", QueryBuilder.bindMarker("tags"))
         .value("shared", QueryBuilder.bindMarker("shared"))
-        .value("debug", QueryBuilder.bindMarker("debug"));
-
-      if (searchEnabled) {
-        insertQuery.value("l_service", QueryBuilder.bindMarker("l_service"));
-        insertQuery.value("annotation_query", QueryBuilder.bindMarker("annotation_query"));
-      }
-
-      this.preparedStatement = session.prepare(insertQuery);
+        .value("debug", QueryBuilder.bindMarker("debug"))
+        .value("annotation_query", QueryBuilder.bindMarker("annotation_query")));
       this.strictTraceId = strictTraceId;
-      this.searchEnabled = searchEnabled;
     }
 
     Input newInput(zipkin2.Span span, UUID ts_uuid) {
@@ -113,7 +106,7 @@ final class InsertSpan extends ResultSetFutureCall {
       } else {
         annotations = Collections.emptyList();
       }
-      String annotation_query = searchEnabled ? CassandraUtil.annotationQuery(span): null;
+      String annotation_query = CassandraUtil.annotationQuery(span);
       return new AutoValue_InsertSpan_Input(
         ts_uuid,
         traceIdHigh ? span.traceId().substring(0, 16) : null,
@@ -122,8 +115,8 @@ final class InsertSpan extends ResultSetFutureCall {
         span.id(),
         span.kind() != null ? span.kind().name() : null,
         span.name(),
-        span.timestampAsLong(),
-        span.durationAsLong(),
+        span.timestamp(),
+        span.duration(),
         span.localEndpoint() != null ? new EndpointUDT(span.localEndpoint()) : null,
         span.remoteEndpoint() != null ? new EndpointUDT(span.remoteEndpoint()) : null,
         annotations,
@@ -182,21 +175,18 @@ final class InsertSpan extends ResultSetFutureCall {
     if (null != input.parent_id()) bound.setString("parent_id", input.parent_id());
     if (null != input.kind()) bound.setString("kind", input.kind());
     if (null != input.span()) bound.setString("span", input.span());
-    if (0L != input.ts()) bound.setLong("ts", input.ts());
-    if (0L != input.duration()) bound.setLong("duration", input.duration());
+    if (null != input.ts()) bound.setLong("ts", input.ts());
+    if (null != input.duration()) bound.setLong("duration", input.duration());
     if (null != input.l_ep()) bound.set("l_ep", input.l_ep(), EndpointUDT.class);
+    if (null != input.l_ep()) bound.setString("l_service", input.l_ep().getService());
     if (null != input.r_ep()) bound.set("r_ep", input.r_ep(), EndpointUDT.class);
     if (!input.annotations().isEmpty()) bound.setList("annotations", input.annotations());
     if (!input.tags().isEmpty()) bound.setMap("tags", input.tags());
+    if (null != input.annotation_query()) {
+      bound.setString("annotation_query", input.annotation_query());
+    }
     if (input.shared()) bound.setBool("shared", true);
     if (input.debug()) bound.setBool("debug", true);
-
-    if (factory.searchEnabled) {
-      if (null != input.l_ep()) bound.setString("l_service", input.l_ep().getService());
-      if (null != input.annotation_query()) {
-        bound.setString("annotation_query", input.annotation_query());
-      }
-    }
     return factory.session.executeAsync(bound);
   }
 

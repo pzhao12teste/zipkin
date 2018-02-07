@@ -1,5 +1,5 @@
 /**
- * Copyright 2015-2018 The OpenZipkin Authors
+ * Copyright 2015-2017 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -40,13 +40,13 @@ public final class V2SpanWriter implements Buffer.Writer<Span> {
       sizeInBytes += 10; // ,"name":""
       sizeInBytes += jsonEscapedSizeInBytes(value.name());
     }
-    if (value.timestampAsLong() != 0L) {
+    if (value.timestamp() != null) {
       sizeInBytes += 13; // ,"timestamp":
-      sizeInBytes += asciiSizeInBytes(value.timestampAsLong());
+      sizeInBytes += asciiSizeInBytes(value.timestamp());
     }
-    if (value.durationAsLong() != 0L) {
+    if (value.duration() != null) {
       sizeInBytes += 12; // ,"duration":
-      sizeInBytes += asciiSizeInBytes(value.durationAsLong());
+      sizeInBytes += asciiSizeInBytes(value.duration());
     }
     if (value.localEndpoint() != null) {
       sizeInBytes += 17; // ,"localEndpoint":
@@ -95,11 +95,11 @@ public final class V2SpanWriter implements Buffer.Writer<Span> {
     if (value.name() != null) {
       b.writeAscii(",\"name\":\"").writeUtf8(jsonEscape(value.name())).writeByte('"');
     }
-    if (value.timestampAsLong() != 0L) {
-      b.writeAscii(",\"timestamp\":").writeAscii(value.timestampAsLong());
+    if (value.timestamp() != null) {
+      b.writeAscii(",\"timestamp\":").writeAscii(value.timestamp());
     }
-    if (value.durationAsLong() != 0L) {
-      b.writeAscii(",\"duration\":").writeAscii(value.durationAsLong());
+    if (value.duration() != null) {
+      b.writeAscii(",\"duration\":").writeAscii(value.duration());
     }
     if (value.localEndpoint() != null) {
       b.writeAscii(",\"localEndpoint\":");

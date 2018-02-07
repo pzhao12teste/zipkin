@@ -1,5 +1,5 @@
 /**
- * Copyright 2015-2018 The OpenZipkin Authors
+ * Copyright 2015-2017 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -15,7 +15,6 @@ package zipkin2.storage.cassandra;
 
 import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Session;
-import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.utils.UUIDs;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,8 +23,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
@@ -37,10 +34,9 @@ import static zipkin2.storage.cassandra.CassandraUtil.traceIdsSortedByDescTimest
 import static zipkin2.storage.cassandra.Schema.TABLE_TRACE_BY_SERVICE_SPAN;
 
 class CassandraSpanStore implements SpanStore { // not final for testing
-  private static final Logger LOG = LoggerFactory.getLogger(CassandraSpanStore.class);
   private final int maxTraceCols;
   private final int indexFetchMultiplier;
-  private final boolean strictTraceId, searchEnabled;
+  private final boolean strictTraceId;
   private final SelectFromSpan.Factory spans;
   private final SelectDependencies.Factory dependencies;
   private final SelectSpanNames.Factory spanNames;
@@ -54,39 +50,15 @@ class CassandraSpanStore implements SpanStore { // not final for testing
     maxTraceCols = storage.maxTraceCols();
     indexFetchMultiplier = storage.indexFetchMultiplier();
     strictTraceId = storage.strictTraceId();
-    searchEnabled = storage.searchEnabled();
+    KeyspaceMetadata md = Schema.getKeyspaceMetadata(session);
+    indexTtl = md.getTable(TABLE_TRACE_BY_SERVICE_SPAN).getOptions().getDefaultTimeToLive();
 
     spans = new SelectFromSpan.Factory(session, strictTraceId, maxTraceCols);
     dependencies = new SelectDependencies.Factory(session);
-
-    if (searchEnabled) {
-      KeyspaceMetadata md = Schema.getKeyspaceMetadata(session);
-      indexTtl = md.getTable(TABLE_TRACE_BY_SERVICE_SPAN).getOptions().getDefaultTimeToLive();
-
-      spanNames = new SelectSpanNames.Factory(session);
-      serviceNames = new SelectServiceNames.Factory(session).create();
-      traceIdsFromServiceSpan = new SelectTraceIdsFromServiceSpan.Factory(session);
-      spanTable = initialiseSelectTraceIdsFromSpan(session);
-    } else {
-      indexTtl = 0;
-      spanNames = null;
-      serviceNames = null;
-      spanTable = null;
-      traceIdsFromServiceSpan = null;
-    }
-  }
-
-  /** This makes it possible to safely drop the annotations_query SASI.
-   *
-   * If dropped, trying to search by annotation in the UI will throw an IllegalStateException.
-   */
-  private static SelectTraceIdsFromSpan.Factory initialiseSelectTraceIdsFromSpan(Session session) {
-    try {
-      return new SelectTraceIdsFromSpan.Factory(session);
-    } catch (DriverException ex) {
-      LOG.warn("failed to prepare annotation_query index statements: " + ex.getMessage());
-      return null;
-    }
+    spanNames = new SelectSpanNames.Factory(session);
+    serviceNames = new SelectServiceNames.Factory(session).create();
+    spanTable = new SelectTraceIdsFromSpan.Factory(session);
+    traceIdsFromServiceSpan = new SelectTraceIdsFromServiceSpan.Factory(session);
   }
 
   /**
@@ -102,8 +74,6 @@ class CassandraSpanStore implements SpanStore { // not final for testing
    */
   @Override
   public Call<List<List<Span>>> getTraces(QueryRequest request) {
-    if (!searchEnabled) return Call.emptyList();
-
     return strictTraceId ? doGetTraces(request) :
       doGetTraces(request).map(new FilterTraces(request));
   }
@@ -116,9 +86,6 @@ class CassandraSpanStore implements SpanStore { // not final for testing
     List<Call<Map<String, Long>>> callsToIntersect = new ArrayList<>();
 
     List<String> annotationKeys = CassandraUtil.annotationKeys(request);
-    if (null == spanTable && !annotationKeys.isEmpty()) {
-      throw new IllegalStateException("The annotation_query index is not available");
-    }
     for (String annotationKey : annotationKeys) {
       callsToIntersect.add(spanTable.newCall(
         request.serviceName(),
@@ -207,12 +174,10 @@ class CassandraSpanStore implements SpanStore { // not final for testing
   }
 
   @Override public Call<List<String>> getServiceNames() {
-    if (!searchEnabled) return Call.emptyList();
     return serviceNames.clone();
   }
 
   @Override public Call<List<String>> getSpanNames(String serviceName) {
-    if (!searchEnabled) return Call.emptyList();
     return spanNames.create(serviceName);
   }
 
