@@ -7,7 +7,6 @@ import SpanNamesData from '../component_data/spanNames';
 import ServiceNamesData from '../component_data/serviceNames';
 import ServiceNameUI from '../component_ui/serviceName';
 import SpanNameUI from '../component_ui/spanName';
-import LookbackUI from '../component_ui/lookback';
 import InfoPanelUI from '../component_ui/infoPanel';
 import InfoButtonUI from '../component_ui/infoButton';
 import JsonPanelUI from '../component_ui/jsonPanel';
@@ -16,7 +15,6 @@ import TracesUI from '../component_ui/traces';
 import TimeStampUI from '../component_ui/timeStamp';
 import BackToTop from '../component_ui/backToTop';
 import {defaultTemplate} from '../templates';
-import {searchDisabled} from '../templates';
 import {contextRoot} from '../publicPath';
 import {i18nInit} from '../component_ui/i18n';
 
@@ -41,11 +39,6 @@ const DefaultPageComponent = component(function DefaultPage() {
 
   this.after('initialize', function() {
     window.document.title = 'Zipkin - Index';
-    if (!this.attr.config('searchEnabled')) {
-      this.$node.html(searchDisabled());
-      return;
-    }
-
     this.trigger(document, 'navigate', {route: 'zipkin/index'});
 
     const query = queryString.parse(window.location.search);
@@ -79,7 +72,6 @@ const DefaultPageComponent = component(function DefaultPage() {
       ServiceNamesData.attachTo(document);
       ServiceNameUI.attachTo('#serviceName');
       SpanNameUI.attachTo('#spanName');
-      LookbackUI.attachTo('#lookback');
       InfoPanelUI.attachTo('#infoPanel');
       InfoButtonUI.attachTo('button.info-request');
       JsonPanelUI.attachTo('#jsonPanel');

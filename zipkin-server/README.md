@@ -21,16 +21,12 @@ Once you've started, browse to http://your_host:9411 to find traces!
 The following endpoints are defined under the base url http://your_host:9411
 * / - [UI](../zipkin-ui)
 * /config.json - [Configuration for the UI](#configuration-for-the-ui)
-* /api/v2 - [Api](https://zipkin.io/zipkin-api/#/)
+* /api/v1 - [Api](http://zipkin.io/zipkin-api/#/)
 * /health - Returns 200 status if OK
 * /info - Provides the version of the running instance
 * /metrics - Includes collector metrics broken down by transport type
 
 There are more [built-in endpoints](https://docs.spring.io/spring-boot/docs/current/reference/html/production-ready-endpoints.html) provided by Spring Boot, such as `/metrics`. To comprehensively list endpoints, `GET /mappings`.
-
-The [legacy /api/v1 Api](https://zipkin.io/zipkin-api/#/) is still supported. Backends are decoupled from the
-HTTP api via data conversion. This means you can still accept legacy data on new backends and visa versa. Enter
-`https://zipkin.io/zipkin-api/zipkin-api.yaml` into the explore box of the Swagger UI to view the old definition
 
 ### CORS (Cross-origin Resource Sharing)
 
@@ -102,7 +98,6 @@ Attribute | Property | Description
 --- | --- | ---
 environment | zipkin.ui.environment | The value here becomes a label in the top-right corner. Not required.
 defaultLookback | zipkin.ui.default-lookback | Default duration in millis to look back when finding traces. Affects the "Start time" element in the UI. Defaults to 3600000 (1 hour in millis).
-searchEnabled | zipkin.ui.search-enabled | If the Find Traces screen is enabled. Defaults to true.
 queryLimit | zipkin.ui.query-limit | Default limit for Find Traces. Defaults to 10.
 instrumented | zipkin.ui.instrumented | Which sites this Zipkin UI covers. Regex syntax. e.g. `http:\/\/example.com\/.*` Defaults to match all websites (`.*`).
 logsUrl | zipkin.ui.logs-url | Logs query service url pattern. If specified, a button will appear on the trace page and will replace {traceId} in the url by the traceId. Not required.
@@ -116,18 +111,12 @@ zipkin-server is a drop-in replacement for the [scala query service](https://git
 
 [yaml configuration](src/main/resources/zipkin-server-shared.yml) binds the following environment variables from zipkin-scala:
 
-* `QUERY_PORT`: Listen port for the http api and web ui; Defaults to 9411
-* `QUERY_ENABLED`: `false` disables the query api and UI assets. Search
-may also be disabled for the storage backend if it is not needed;
-Defaults to true
-* `SEARCH_ENABLED`: `false` disables trace search requests on the storage
-backend. Does not disable trace by ID or dependency queries. Disable this
-when you use another service (such as logs) to find trace IDs;
-Defaults to true
-* `QUERY_LOG_LEVEL`: Log level written to the console; Defaults to INFO
-* `QUERY_LOOKBACK`: How many milliseconds queries can look back from endTs; Defaults to 24 hours (two daily buckets: one for today and one for yesterday)
-* `STORAGE_TYPE`: SpanStore implementation: one of `mem`, `mysql`, `cassandra`, `elasticsearch`
-* `COLLECTOR_SAMPLE_RATE`: Percentage of traces to retain, defaults to always sample (1.0).
+    * `QUERY_PORT`: Listen port for the http api and web ui; Defaults to 9411
+    * `QUERY_ENABLED`: `false` disables the query api and UI assets; Defaults to true
+    * `QUERY_LOG_LEVEL`: Log level written to the console; Defaults to INFO
+    * `QUERY_LOOKBACK`: How many milliseconds queries can look back from endTs; Defaults to 24 hours (two daily buckets: one for today and one for yesterday)
+    * `STORAGE_TYPE`: SpanStore implementation: one of `mem`, `mysql`, `cassandra`, `elasticsearch`
+    * `COLLECTOR_SAMPLE_RATE`: Percentage of traces to retain, defaults to always sample (1.0).
 
 ### Cassandra Storage
 Zipkin's [Cassandra v3 storage component](../zipkin-storage/zipkin2_cassandra)
@@ -238,15 +227,15 @@ $ STORAGE_TYPE=elasticsearch ES_AWS_DOMAIN=mydomain ES_AWS_REGION=ap-southeast-1
 ```
 
 #### Service and Span names query
-The [Zipkin Api](https://zipkin.io/zipkin-api/#/default/get_services) does not include
+The [Zipkin query api v1](http://zipkin.io/zipkin-api/#/paths/%252Fservices) does not include
 a parameter for how far back to look for service or span names. In order
 to prevent excessive load, service and span name queries are limited by
 `QUERY_LOOKBACK`, which defaults to 24hrs (two daily buckets: one for
 today and one for yesterday)
 
 ### HTTP Collector
-The HTTP collector is enabled by default. It accepts spans via `POST /api/v1/spans` and `POST /api/v2/spans`.
-The HTTP collector supports the following configuration:
+The HTTP collector is enabled by default. It accepts spans via `POST /api/v1/spans`. The HTTP
+collector supports the following configuration:
 
 Property | Environment Variable | Description
 --- | --- | ---

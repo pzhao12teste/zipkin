@@ -1,5 +1,5 @@
 /**
- * Copyright 2015-2018 The OpenZipkin Authors
+ * Copyright 2015-2017 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -22,9 +22,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import zipkin2.internal.Nullable;
 import zipkin2.Annotation;
 import zipkin2.Span;
-import zipkin2.internal.Nullable;
 
 /**
  * Invoking this request retrieves traces matching the below filters.
@@ -39,6 +39,7 @@ import zipkin2.internal.Nullable;
  */
 @AutoValue
 public abstract class QueryRequest {
+
   /**
    * When present, corresponds to {@link zipkin2.Endpoint#serviceName} and constrains all other
    * parameters.
@@ -211,18 +212,18 @@ public abstract class QueryRequest {
    */
   public boolean test(List<Span> spans) {
     // v2 returns raw spans in any order, get the root's timestamp or the first timestamp
-    long timestamp = 0L;
+    Long timestamp = null;
     for (Span span : spans) {
-      if (span.timestampAsLong() == 0L) continue;
+      if (span.timestamp() == null) continue;
       if (span.parentId() == null) {
-        timestamp = span.timestampAsLong();
+        timestamp = span.timestamp();
         break;
       }
-      if (timestamp == 0L || timestamp > span.timestampAsLong()) {
-        timestamp = span.timestampAsLong();
+      if (timestamp == null || timestamp > span.timestamp()) {
+        timestamp = span.timestamp();
       }
     }
-    if (timestamp == 0L ||
+    if (timestamp == null ||
       timestamp < (endTs() - lookback()) * 1000 ||
       timestamp > endTs() * 1000) {
       return false;
@@ -258,9 +259,9 @@ public abstract class QueryRequest {
 
       if ((serviceName() == null || serviceName().equals(localServiceName)) && !testedDuration) {
         if (minDuration() != null && maxDuration() != null) {
-          testedDuration = span.durationAsLong() >= minDuration() && span.durationAsLong() <= maxDuration();
+          testedDuration = span.duration() >= minDuration() && span.duration() <= maxDuration();
         } else if (minDuration() != null) {
-          testedDuration = span.durationAsLong() >= minDuration();
+          testedDuration = span.duration() >= minDuration();
         }
       }
     }

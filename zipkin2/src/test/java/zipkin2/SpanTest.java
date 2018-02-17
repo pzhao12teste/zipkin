@@ -1,5 +1,5 @@
 /**
- * Copyright 2015-2018 The OpenZipkin Authors
+ * Copyright 2015-2017 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -104,40 +104,6 @@ public class SpanTest {
       .isNull();
     assertThat(span.duration())
       .isNull();
-  }
-
-  @Test public void canUsePrimitiveOverloads() {
-    Span primitives = base.toBuilder()
-      .timestamp(1L)
-      .duration(1L)
-      .shared(true)
-      .debug(true)
-      .build();
-
-    Span objects =  base.toBuilder()
-      .timestamp(Long.valueOf(1L))
-      .duration(Long.valueOf(1L))
-      .shared(Boolean.TRUE)
-      .debug(Boolean.TRUE)
-      .build();
-
-    assertThat(primitives)
-      .isEqualToComparingFieldByField(objects);
-  }
-
-  @Test public void nullToZeroOrFalse() {
-    Span nulls = base.toBuilder()
-      .timestamp(null)
-      .duration(null)
-      .build();
-
-    Span zeros =  base.toBuilder()
-      .timestamp(0L)
-      .duration(0L)
-      .build();
-
-    assertThat(nulls)
-      .isEqualToComparingFieldByField(zeros);
   }
 
   @Test public void toString_isJson() {

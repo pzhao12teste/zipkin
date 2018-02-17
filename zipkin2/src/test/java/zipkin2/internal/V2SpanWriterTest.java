@@ -1,5 +1,5 @@
 /**
- * Copyright 2015-2018 The OpenZipkin Authors
+ * Copyright 2015-2017 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -23,7 +23,6 @@ import zipkin2.Span;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static zipkin2.TestObjects.CLIENT_SPAN;
-import static zipkin2.TestObjects.TODAY;
 
 public class V2SpanWriterTest {
   V2SpanWriter writer = new V2SpanWriter();
@@ -48,7 +47,7 @@ public class V2SpanWriterTest {
     writer.write(CLIENT_SPAN, buf);
 
     assertThat(new String(buf.toByteArray(), "UTF-8"))
-      .contains("{\"timestamp\":" + (TODAY - 100) * 1000L + ",\"value\":\"foo\"}");
+      .contains("{\"timestamp\":1472470996238000,\"value\":\"foo\"}");
   }
 
   @Test public void omitsEmptySpanName() throws IOException {

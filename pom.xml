@@ -18,7 +18,7 @@
 
   <groupId>io.zipkin.java</groupId>
   <artifactId>parent</artifactId>
-  <version>2.4.6-SNAPSHOT</version>
+  <version>2.4.3-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <modules>
@@ -47,7 +47,7 @@
     <main.basedir>${project.basedir}</main.basedir>
 
     <brave.version>4.8.0</brave.version>
-    <cassandra-driver-core.version>3.4.0</cassandra-driver-core.version>
+    <cassandra-driver-core.version>3.3.2</cassandra-driver-core.version>
     <okio.version>1.13.0</okio.version>
     <!-- important to keep this in sync with spring-boot-dependencies -->
     <jooq.version>3.9.6</jooq.version>
@@ -90,7 +90,7 @@
 
     <!-- Catch common Java mistakes as compile-time errors -->
     <plexus-compiler-javac-errorprone.version>2.8.2</plexus-compiler-javac-errorprone.version>
-    <errorprone.version>2.2.0</errorprone.version>
+    <errorprone.version>2.1.3</errorprone.version>
   <gib.commitRange>${env.TRAVIS_COMMIT_RANGE}</gib.commitRange>
         <gib.enabled>true</gib.enabled>
         <gib.useEkstazi>true</gib.useEkstazi>
@@ -367,13 +367,6 @@
         <groupId>com.google.auto.value</groupId>
         <artifactId>auto-value</artifactId>
         <version>1.5.3</version>
-      </dependency>
-
-      <!-- for testing flink -->
-      <dependency>
-        <groupId>com.esotericsoftware.kryo</groupId>
-        <artifactId>kryo</artifactId>
-        <version>2.24.0</version>
       </dependency>
 
       <dependency>
@@ -764,7 +757,7 @@
             <extension>
                 <groupId>edu.illinois</groupId>
                 <artifactId>incremental-builder-with-ekstazi</artifactId>
-                <version>3.5.3</version>
+                <version>3.5.4</version>
             </extension>
         </extensions>
     </build>

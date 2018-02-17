@@ -1,5 +1,5 @@
 /**
- * Copyright 2015-2018 The OpenZipkin Authors
+ * Copyright 2015-2017 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -27,7 +27,6 @@ import zipkin2.Callback;
 import zipkin2.Endpoint;
 import zipkin2.Span;
 import zipkin2.Span.Kind;
-import zipkin2.TestObjects;
 import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.Nullable;
@@ -35,7 +34,6 @@ import zipkin2.internal.Nullable;
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.failBecauseExceptionWasNotThrown;
-import static zipkin2.TestObjects.TODAY;
 import static zipkin2.elasticsearch.ElasticsearchSpanConsumer.prefixWithTimestampMillisAndQuery;
 
 public class ElasticsearchSpanConsumerTest {
@@ -51,10 +49,6 @@ public class ElasticsearchSpanConsumerTest {
   /** gets the index template so that each test doesn't have to */
   @Before
   public void ensureIndexTemplate() throws Exception {
-    ensureIndexTemplates(storage);
-  }
-
-  private void ensureIndexTemplates(ElasticsearchStorage storage) throws InterruptedException {
     es.enqueue(new MockResponse().setBody("{\"version\":{\"number\":\"6.0.0\"}}"));
     es.enqueue(new MockResponse()); // get span template
     es.enqueue(new MockResponse()); // get dependency template
@@ -73,12 +67,12 @@ public class ElasticsearchSpanConsumerTest {
     es.enqueue(new MockResponse());
 
     Span span = Span.newBuilder().traceId("20").id("20").name("get")
-      .timestamp(TODAY * 1000).build();
+      .timestamp(TestObjects.TODAY * 1000).build();
 
     accept(span);
 
     assertThat(es.takeRequest().getBody().readUtf8())
-      .contains("\n{\"timestamp_millis\":" + Long.toString(TODAY) + ",\"traceId\":");
+      .contains("\n{\"timestamp_millis\":" + Long.toString(TestObjects.TODAY) + ",\"traceId\":");
   }
 
   @Test public void prefixWithTimestampMillisAndQuery_skipsWhenNoData() throws Exception {
@@ -87,7 +81,7 @@ public class ElasticsearchSpanConsumerTest {
       .kind(Kind.CLIENT)
       .build();
 
-    byte[] result = prefixWithTimestampMillisAndQuery(span, span.timestampAsLong());
+    byte[] result = prefixWithTimestampMillisAndQuery(span, span.timestamp());
 
     assertThat(new String(result, "UTF-8"))
       .startsWith("{\"traceId\":\"");
@@ -99,7 +93,7 @@ public class ElasticsearchSpanConsumerTest {
       .kind(Kind.CLIENT)
       .build();
 
-    byte[] result = prefixWithTimestampMillisAndQuery(span, span.timestampAsLong());
+    byte[] result = prefixWithTimestampMillisAndQuery(span, span.timestamp());
 
     assertThat(new String(result, "UTF-8"))
       .startsWith("{\"timestamp_millis\":1,\"traceId\":");
@@ -111,7 +105,7 @@ public class ElasticsearchSpanConsumerTest {
       .addAnnotation(1L, "\"foo")
       .build();
 
-    byte[] result = prefixWithTimestampMillisAndQuery(span, span.timestampAsLong());
+    byte[] result = prefixWithTimestampMillisAndQuery(span, span.timestamp());
 
     assertThat(new String(result, "UTF-8"))
       .startsWith("{\"_q\":[\"\\\"foo\"],\"traceId");
@@ -123,7 +117,7 @@ public class ElasticsearchSpanConsumerTest {
       .putTag("\"foo", "\"bar")
       .build();
 
-    byte[] result = prefixWithTimestampMillisAndQuery(span, span.timestampAsLong());
+    byte[] result = prefixWithTimestampMillisAndQuery(span, span.timestamp());
 
     assertThat(new String(result, "UTF-8"))
       .startsWith("{\"_q\":[\"\\\"foo\",\"\\\"foo=\\\"bar\"],\"traceId");
@@ -131,7 +125,7 @@ public class ElasticsearchSpanConsumerTest {
 
   @Test public void prefixWithTimestampMillisAndQuery_readable() throws Exception {
     Span span = Span.newBuilder().traceId("20").id("20").name("get")
-      .timestamp(TODAY * 1000).build();
+      .timestamp(TestObjects.TODAY * 1000).build();
 
     assertThat(
       SpanBytesDecoder.JSON_V2.decodeOne(prefixWithTimestampMillisAndQuery(span, span.timestamp())))
@@ -253,55 +247,6 @@ public class ElasticsearchSpanConsumerTest {
     assertThat(es.takeRequest().getBody().readByteString().utf8()).contains(
       "{\"index\":{\"_index\":\"zipkin:span-1971-01-01\",\"_type\":\"span\"}}"
     );
-  }
-
-  /** Much simpler template which doesn't write the timestamp_millis field */
-  @Test
-  public void searchDisabled_simplerIndexTemplate() throws Exception {
-    try (ElasticsearchStorage storage = ElasticsearchStorage.newBuilder()
-      .hosts(this.storage.hostsSupplier().get())
-      .searchEnabled(false).build()) {
-
-      es.enqueue(new MockResponse().setBody("{\"version\":{\"number\":\"6.0.0\"}}"));
-      es.enqueue(new MockResponse().setResponseCode(404)); // get span template
-      es.enqueue(new MockResponse()); // put span template
-      es.enqueue(new MockResponse()); // get dependency template
-      storage.ensureIndexTemplates();
-      es.takeRequest(); // get version
-      es.takeRequest(); // get span template
-
-      assertThat(es.takeRequest().getBody().readUtf8()) // put span template
-        .contains(""
-          + "  \"mappings\": {\n"
-          + "    \"_default_\": {  },\n"
-          + "    \"span\": {\n"
-          + "      \"properties\": {\n"
-          + "        \"traceId\": { \"type\": \"keyword\", \"norms\": false },\n"
-          + "        \"annotations\": { \"enabled\": false },\n"
-          + "        \"tags\": { \"enabled\": false }\n"
-          + "      }\n"
-          + "    }\n"
-          + "  }\n");
-    }
-  }
-
-  /** Less overhead as a span json isn't rewritten to include a millis timestamp */
-  @Test public void searchDisabled_doesntAddTimestampMillis() throws Exception {
-    try (ElasticsearchStorage storage = ElasticsearchStorage.newBuilder()
-      .hosts(this.storage.hostsSupplier().get())
-      .searchEnabled(false).build()) {
-
-      ensureIndexTemplates(storage);
-      es.enqueue(new MockResponse()); // for the bulk request
-
-      Span span = Span.newBuilder().traceId("20").id("20").name("get")
-        .timestamp(TODAY * 1000).build();
-
-      storage.spanConsumer().accept(asList(span)).execute();
-
-      assertThat(es.takeRequest().getBody().readUtf8())
-        .doesNotContain("timestamp_millis");
-    }
   }
 
   void accept(Span... spans) throws Exception {
